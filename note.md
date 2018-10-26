@@ -188,3 +188,9 @@ $ gsettings set org.gnome.desktop.media-handling automount-open true
 ```
 原因可能是ｕａｒｔ　连接的别的ｉｃ　会把ｒｘ一直拉高，调试的时候，最好先量一下ＴＸ，ＲＸ脚，以确保无外界芯片干扰
 ```
+
+#### modetest
+
+```
+modetest -M virtio_gpu -s 30:640x480 -C
+```
