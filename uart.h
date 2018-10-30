@@ -46,7 +46,7 @@ typedef enum
 extern int uart_open(UART_T *uart);
 extern void uart_close(UART_T *uart);
 extern void uart_init(UART_T *uart,  UART_NAME  dev_num, int baud);
-extern void set_uart_raw_mode(UART_T *uart);
+extern void set_uart_mode(UART_T *uart);
 
 
 

@@ -1,21 +1,104 @@
 #include "uart.h"
+#include <stdio.h>
+#include <errno.h>
+#include <stdlib.h> 
+#include <sys/types.h>
+#include <sys/time.h>
+#include <unistd.h> 
 
 
-#if 1
+
 int main(int argc, char **argv)
 {
 
 	int retval = -1;
 	int i;
-	UART_T myuart;
-	printf("hello\n");
-	uart_init(&myuart,COM2, B115200);
+        UART_T myuart;
+        FILE *f;
+        char s[1024];
+        int ret;
+        char rbuf[1024];
+        int timecount;
+        int maxfd;
+        int count;
+        int fdarr[2] = { 0 };
+        fd_set rfds;//设置监听读集合
+        fd_set wfds;//设置监听读集合
+        struct timeval tv;//设置等待时间，0不等待，NULL一直等待。
+        uart_init(&myuart,"/dev/ttyUSB0", B115200);
 	retval = uart_open(&myuart);
+        maxfd = myuart.fd +1;
+        FD_ZERO(&rfds);//清空集合
+        FD_ZERO(&wfds);//清空集合
+        FD_SET(myuart.fd, &rfds);/*add uart fd to select set*/
+        FD_SET(myuart.fd, &wfds);/*add uart fd to select set*/
         int read_len= 0;
         char read_buf[20];
+        FILE *f;
+        char s[1024];
+        int ret;
+        f = popen("./test.py 99", "r");
         if (retval == -1)
-		return -1;
-	set_uart_raw_mode(&myuart);
+                return -1;
+        ret = pipe(fdarr);
+        if (ret == -1)
+        {
+                printf("pipe() is failed ! message :%s\n", strerror(errno));
+                return -1;
+        }
+        pid_t child = fork();
+        if (child == -1)
+        {
+                printf("system is game over !\n");
+                return -1;
+        }
+        if (child == 0){
+                close(fdarr[0]);
+                while((ret=fread(s,3,1024,f))>0) {
+                        fwrite(s,3,ret,fdarr[1]);
+                }
+                fclose(f);
+                return -1;
+        } else {
+                close(fdarr[1]);
+                while (1) {
+                        tv.tv_sec = 10;
+                        tv.tv_usec = 0;//设置等待时间
+                        ret = select(maxfd, &rfds, &wfds, NULL, &tv);
+                        if (ret < 0){
+                                printf("err: %s,%d\n",__func__,__LINE__);
+                        } else if (FD_ISSET(myuart.fd, &rfds)){
+                                memset(rbuf, 0x00, sizeof(rbuf));
+                                count = read(myuart.fd, rbuf, sizeof(rbuf));
+                                /*处理数据*/
+                                printf("rev uart data count = %d ,%s,%d\n",__func__,__LINE__,count);
+                        } else if (FD_ISSET(myuart.fd, &wfds)){
+
+
+                        }
+                }                                                                                   
+
+
+        }
+
+        set_uart_mode(&myuart);
+        while (1) {
+                tv.tv_sec = 10;
+                tv.tv_usec = 0;//设置等待时间
+                ret = select(maxfd, &rfds, &wfds, NULL, &tv);
+                if (ret < 0){
+                        printf("err: %s,%d\n",__func__,__LINE__);
+                } else if (FD_ISSET(myuart.fd, &rfds)){
+                        memset(rbuf, 0x00, sizeof(rbuf));
+                        count = read(myuart.fd, rbuf, sizeof(rbuf));
+                        /*处理数据*/
+                        printf("rev uart data count = %d ,%s,%d\n",__func__,__LINE__,count);
+                } else if (FD_ISSET(myuart.fd, &wfds)){
+
+
+                }
+        }
+
         /*
 	while(1)
 	{*/	
@@ -55,102 +138,3 @@ int main(int argc, char **argv)
 	uart_close(&myuart);
 	return 0;
 }
-#else
-int main(int argc, char **argv)
-{
-
-	char retval = -1;
-	int i;
-	UART_T myuart;
-	char *msg = "hello";
-	pid_t pid;
-
-	uart_init(&myuart,11, B115200);
-	retval = uart_open(&myuart);
-	if (retval == -1)
-		return -1;
-	set_uart_raw_mode(&myuart);
-#if 1
-	pid = fork();
-	if (pid < 0)
-	{
-	}
-	else if (pid == 0)
-	{
-		
-		while(1)
-		{
-			#if 1	
-			int write_len = 0;
-			char write_buf[20];
-			bzero(write_buf, sizeof(write_buf));
-	        fgets(write_buf, sizeof(write_buf), stdin);
-			//write_buf[strlen(write_buf)] = '\0';
-
-				char cmd[] = {0x3C, 0x07, 0x12, 0x08, 0x10, 0x03, 0x8F};	
-				retval = write(myuart.fd, cmd, strlen(cmd));
-				if (retval > 0)
-					printf("cmd send ok\n");
-/*
-			if (strcmp(write_buf, "start") == 0){
-				char cmd[] = {0x3C, 0x07, 0x12, 0x08, 0x10, 0x03, 0x8F};	
-				retval = write(myuart.fd, cmd, strlen(cmd));
-				if (retval > 0)
-					printf("cmd send ok\n");
-			}
-			else{
-				retval = write(myuart.fd, write_buf, strlen(write_buf));
-				printf("we input %s\n", write_buf);
-			}
-*/
-			#else	
-			char tmp[]={0x01, 0x03, 0x0c, 0x00};
-			retval = write(myuart.fd, tmp, strlen(tmp));
-			if (retval > 0)
-				printf("send ok\n");
-			sleep(2);
-			#endif
-		}
-	}
-	else
-	{
-		//tcflush(myuart.fd, TCIOFLUSH);
-		//fflush(NULL);
-		while(1)
-		{
-			int read_len= 0;
-			char read_buf[20];
-			bzero(read_buf, sizeof(read_buf));
-	       // while((read_len = read(uart.fd, &data, sizeof(data)) > 0))
-	       // {
-	        //	tcflush(uart.fd, TCOFLUSH);
-	        //	printf("we get data is = %d\n", data);
-	       // }
-	       
-	        //read(uart.fd, &data, sizeof(data));
-	        //printf("we get %d\n", data);
-	        //			fflush(NULL);
-			read_len = read(myuart.fd, read_buf, sizeof(read_buf));
-		   	printf("receive size = %d\n", read_len);
-			for (i=0; i<read_len; i++)
-			{
-				printf("read_buf[%d]=0x%xh\n", i, read_buf[i]);
-				//fflush(NULL);
-			}
-			//printf("read_buf=%c\n", read_buf);
-		}		
-
-	}
-#endif
-	uart_close(&myuart);
-	return 0;
-}
-#endif
-
-
-
-
-
-
-
-
